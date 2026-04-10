@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IPTV Player</title>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --bg2: #1a1a1a;
+    --bg3: #242424;
+    --bg4: #2e2e2e;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f0f0;
+    --text2: #999;
+    --text3: #666;
+    --accent: #e50914;
+    --accent2: #ff2d2d;
+    --green: #1db954;
+    --blue: #0a84ff;
+    --radius: 8px;
+    --sidebar: 280px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input, textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+    -webkit-app-region: no-drag !important;
+    cursor: text;
+  }
+
+  /* ── Title bar ── */
+  #titlebar {
+    height: 38px;
+    -webkit-app-region: drag;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+  }
+  body.win32 #titlebar {
+    display: none;
+  }
+  #titlebar .title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.3px;
+  }
+  #titlebar .controls {
+    position: absolute;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    -webkit-app-region: no-drag;
+  }
+  #titlebar .tb-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s, color 0.15s;
+  }
+  #titlebar .tb-btn:hover { background: var(--bg3); color: var(--text); }
+  #titlebar .tb-btn.active { color: var(--accent); }
+
+  /* ── Layout ── */
+  #layout {
+    display: flex;
+    height: calc(100vh - 38px);
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: var(--sidebar);
+    min-width: var(--sidebar);
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease, min-width 0.2s ease;
+  }
+  #sidebar.collapsed { width: 0; min-width: 0; border-right: none; }
+
+  .sidebar-section {
+    padding: 10px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* playlist input */
+  .playlist-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .playlist-row input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 8px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .playlist-row input::placeholder { color: var(--text3); }
+  .playlist-row input:focus { border-color: var(--border2); }
+  .icon-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: var(--radius);
+    padding: 6px 9px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: var(--bg4); color: var(--text); }
+  .load-btn {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .load-btn:hover { background: var(--accent2); }
+
+  /* group tabs */
+  #group-tabs {
+    display: flex;
+    gap: 5px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    scrollbar-width: none;
+  }
+  #group-tabs::-webkit-scrollbar { display: none; }
+  .gtab {
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text2);
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .gtab:hover { border-color: var(--border2); color: var(--text); }
+  .gtab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* search */
+  #search-wrap {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  #search {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 12px;
+    padding: 6px 8px 6px 28px;
+    outline: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 8px center;
+    transition: border-color 0.15s;
+  }
+  #search::placeholder { color: var(--text3); }
+  #search:focus { border-color: var(--border2); }
+
+  /* channel list */
+  #channel-list {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg4) transparent;
+  }
+  #channel-list::-webkit-scrollbar { width: 5px; }
+  #channel-list::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+  .ch-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    position: relative;
+  }
+  .ch-item:hover { background: var(--bg2); }
+  .ch-item.active { background: var(--bg3); }
+  .ch-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent);
+    border-radius: 0 2px 2px 0;
+  }
+  .ch-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text2);
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .ch-thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .ch-meta { flex: 1; min-width: 0; }
+  .ch-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ch-group { font-size: 11px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+  .fav-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+  .ch-item:hover .fav-btn { opacity: 1; }
+  .fav-btn.starred { color: #f5a623; opacity: 1 !important; }
+
+  .list-empty {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  /* ── Main content ── */
+  #content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* Video area */
+  #video-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    background: #000;
+    min-height: 0;
+  }
+
+  #video {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+
+  /* Placeholder */
+  #placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: #000;
+    color: var(--text3);
+    font-size: 14px;
+  }
+  #placeholder .big-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid var(--bg4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #placeholder p { color: var(--text3); font-size: 13px; }
+
+  /* OSD overlay */
+  #osd {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.7) 100%);
+    opacity: 0;
+    transition: opacity 0.25s;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 14px 18px;
+  }
+  #osd.visible { opacity: 1; pointer-events: auto; }
+
+  #osd-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  #osd-ch-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+  #osd-live-badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Controls bar */
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .ctrl-btn {
+    background: none;
+    border: none;
+    color: var(--text2);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .ctrl-btn:hover { background: var(--bg3); color: var(--text); }
+  .ctrl-btn.active { color: var(--accent); }
+  .ctrl-btn svg { width: 18px; height: 18px; fill: currentColor; }
+
+  .ctrl-sep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+  /* Volume */
+  #vol-wrap { display: flex; align-items: center; gap: 8px; }
+  #vol-slider {
+    -webkit-appearance: none;
+    width: 80px;
+    height: 3px;
+    background: var(--bg4);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  #vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #vol-slider::-webkit-slider-thumb:hover { background: #fff; }
+  #vol-val { font-size: 11px; color: var(--text3); min-width: 28px; }
+
+  /* Now playing */
+  #now-playing {
+    flex: 1;
+    font-size: 12px;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #now-playing strong { color: var(--text); }
+
+  /* Status */
+  #status-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--text3);
+    padding: 3px 8px;
+    border-radius: 99px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+  }
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text3);
+    flex-shrink: 0;
+  }
+  .dot.live { background: var(--accent); animation: pulse 1.5s infinite; }
+  .dot.loading { background: #f5a623; animation: pulse 0.8s infinite; }
+  .dot.error { background: var(--accent); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* EPG Panel */
+  #epg-panel {
+    width: 320px;
+    min-width: 320px;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease, min-width 0.2s ease;
+  }
+  #epg-panel.hidden { width: 0; min-width: 0; border-left: none; }
+
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-header h3 { font-size: 13px; font-weight: 600; color: var(--text); }
+  .panel-close {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+  }
+  .panel-close:hover { color: var(--text); }
+
+  #epg-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg4) transparent;
+  }
+
+  #epg-url-wrap {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+  }
+  #epg-url-wrap input {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 11px;
+    padding: 5px 7px;
+    outline: none;
+  }
+  #epg-url-wrap input::placeholder { color: var(--text3); }
+  #epg-url-wrap button {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: var(--radius);
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.15s;
+  }
+  #epg-url-wrap button:hover { background: var(--bg4); color: var(--text); }
+
+  .epg-entry {
+    padding: 10px 12px;
+    border-radius: var(--radius);
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg2);
+    transition: border-color 0.15s;
+  }
+  .epg-entry:hover { border-color: var(--border2); }
+  .epg-entry.now { border-color: var(--accent); background: rgba(229,9,20,0.08); }
+  .epg-time { font-size: 10px; color: var(--text3); margin-bottom: 3px; }
+  .epg-title { font-size: 12px; font-weight: 500; }
+  .epg-desc { font-size: 11px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+  .epg-badge {
+    display: inline-block;
+    font-size: 10px;
+    background: var(--accent);
+    color: #fff;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .epg-progress {
+    height: 2px;
+    background: var(--bg4);
+    border-radius: 1px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  .epg-progress-bar { height: 100%; background: var(--accent); border-radius: 1px; }
+
+  /* Favorites panel */
+  #fav-panel {
+    width: 300px;
+    min-width: 300px;
+    background: var(--bg);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.2s ease, min-width 0.2s ease;
+  }
+  #fav-panel.hidden { width: 0; min-width: 0; border-left: none; }
+
+  #fav-list { flex: 1; overflow-y: auto; padding: 8px 0; scrollbar-width: thin; scrollbar-color: var(--bg4) transparent; }
+  .fav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--border);
+  }
+  .fav-item:hover { background: var(--bg2); }
+  .fav-item .fav-name { flex: 1; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fav-remove {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+  }
+  .fav-item:hover .fav-remove { opacity: 1; }
+  .fav-remove:hover { color: var(--accent); }
+
+  /* Toast */
+  #toast {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 100;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Keyboard shortcut hint */
+  .hint { font-size: 10px; color: var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- Title bar -->
+<div id="titlebar">
+  <span class="title" id="titlebar-text">IPTV Player</span>
+  <div class="controls">
+    <button class="tb-btn" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle sidebar (⌘B)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+    </button>
+    <button class="tb-btn" id="toggle-fav-btn" onclick="toggleFavPanel()" title="Favorites">
+      ★ Favorites
+    </button>
+    <button class="tb-btn" id="toggle-epg-btn" onclick="toggleEpgPanel()" title="Guide">
+      ≡ Guide
+    </button>
+  </div>
+</div>
+
+<!-- Layout -->
+<div id="layout">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-section">
+      <div class="playlist-row">
+        <input id="m3u-url" type="text" placeholder="M3U playlist URL…" onkeydown="if(event.key==='Enter')loadPlaylist()" />
+        <button class="icon-btn" onclick="openFile()" title="Open local file">📂</button>
+        <button class="load-btn" onclick="loadPlaylist()">Load</button>
+      </div>
+    </div>
+
+    <div id="group-tabs"></div>
+
+    <div id="search-wrap">
+      <input id="search" type="text" placeholder="Search channels…" oninput="renderChannels()" />
+    </div>
+
+    <div id="channel-list">
+      <div class="list-empty">
+        Load an M3U playlist to see channels.<br/>
+        <span class="hint">File → Open M3U File… or paste a URL above</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div id="content">
+    <div id="video-wrap">
+      <video id="video" autoplay></video>
+
+      <!-- Placeholder -->
+      <div id="placeholder">
+        <div class="big-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="#444"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <p>Select a channel to start watching</p>
+      </div>
+
+      <!-- OSD overlay -->
+      <div id="osd">
+        <div id="osd-top">
+          <span id="osd-ch-name"></span>
+          <span id="osd-live-badge" style="display:none">LIVE</span>
+        </div>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- Seek bar (VOD only) -->
+    <div id="seek-wrap" style="display:none; align-items:center; gap:10px; padding:6px 16px 0; background:var(--bg);">
+      <span id="seek-current" style="font-size:11px;color:var(--text3);min-width:38px;">0:00</span>
+      <input type="range" id="seek-slider" min="0" max="100" value="0" style="flex:1;" oninput="seekTo(this.value)" />
+      <span id="seek-duration" style="font-size:11px;color:var(--text3);min-width:38px;text-align:right;">0:00</span>
+    </div>
+
+    <!-- Controls bar -->
+    <div id="controls">
+      <!-- Play/pause -->
+      <button class="ctrl-btn" id="play-btn" onclick="togglePlay()" title="Play/Pause (Space)">
+        <svg id="play-icon" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+      </button>
+
+      <!-- Stop -->
+      <button class="ctrl-btn" onclick="stopStream()" title="Stop">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+      </button>
+
+      <div class="ctrl-sep"></div>
+
+      <!-- Volume -->
+      <div id="vol-wrap">
+        <button class="ctrl-btn" id="mute-btn" onclick="toggleMute()" title="Mute (M)">
+          <svg id="vol-icon" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path id="vol-lines" d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        </button>
+        <input type="range" id="vol-slider" min="0" max="100" value="100" oninput="setVolume(this.value)" />
+        <span id="vol-val">100%</span>
+      </div>
+
+      <div class="ctrl-sep"></div>
+
+      <!-- Now playing -->
+      <div id="now-playing">No channel selected</div>
+
+      <div class="ctrl-sep"></div>
+
+      <!-- Status -->
+      <div id="status-pill">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-text">Idle</span>
+      </div>
+
+      <!-- Fullscreen -->
+      <button class="ctrl-btn" id="fs-btn" onclick="toggleFullscreen()" title="Fullscreen (F)">
+        <svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Favorites panel -->
+  <div id="fav-panel" class="hidden">
+    <div class="panel-header">
+      <h3>★ Favorites</h3>
+      <button class="panel-close" onclick="toggleFavPanel()">✕</button>
+    </div>
+    <div id="fav-list"></div>
+  </div>
+
+  <!-- EPG panel -->
+  <div id="epg-panel" class="hidden">
+    <div class="panel-header">
+      <h3>TV Guide</h3>
+      <button class="panel-close" onclick="toggleEpgPanel()">✕</button>
+    </div>
+    <div id="epg-url-wrap">
+      <input id="epg-url" type="text" placeholder="XMLTV EPG URL (optional)…" />
+      <button onclick="loadEPG()">Load</button>
+    </div>
+    <div id="epg-content">
+      <div class="list-empty">Select a channel to view the guide, or load an XMLTV EPG URL above.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+<script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "name": "iptv-player",
+  "version": "1.0.0",
+  "description": "IPTV Player for macOS and Windows",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "devDependencies": {
+    "electron": "^41.2.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.iptvplayer.app",
+    "productName": "IPTV Player",
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.entertainment",
+      "icon": "assets/icon.png",
+      "target": [
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
+      ],
+      "darkModeSupport": true
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IPTV Player"
+    },
+    "dmg": {
+      "title": "IPTV Player",
+      "background": null,
+      "window": { "width": 540, "height": 380 }
+    },
+    "files": [
+      "src/main.js",
+      "src/preload.js",
+      "src/renderer.js",
+      "src/index.html",
+      "assets/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
