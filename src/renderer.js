@@ -285,8 +285,9 @@ function playChannel(idx) {
 
 function startStream(url) {
   if (hls) { hls.destroy(); hls = null; }
-  video.src = '';
-  setStatus('loading', 'Connecting…');
+  video.removeAttribute('src');
+  video.load();
+  setStreamStatus('loading', 'Connecting…');
   updatePlayBtn(false);
   document.getElementById('seek-wrap').style.display = 'none';
   document.getElementById('seek-slider').value = 0;
@@ -303,12 +304,12 @@ function startStream(url) {
     hls.attachMedia(video);
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
       video.play().catch(() => {});
-      setStatus('live', 'Live');
+      setStreamStatus('live', 'Live');
       updatePlayBtn(true);
     });
     hls.on(Hls.Events.ERROR, (_, d) => {
       if (d.fatal) {
-        setStatus('error', 'Stream error');
+        setStreamStatus('error', 'Stream error');
         updatePlayBtn(false);
       }
     });
@@ -324,24 +325,25 @@ function startStream(url) {
 
 function stopStream() {
   if (hls) { hls.destroy(); hls = null; }
-  video.src = '';
+  video.removeAttribute('src');
+  video.load();
   video.pause();
   currentChannel = null;
   placeholder.style.display = 'flex';
   document.getElementById('now-playing').textContent = 'No channel selected';
   document.getElementById('titlebar-text').textContent = 'IPTV Player';
   document.title = 'IPTV Player';
-  setStatus('idle', 'Idle');
+  setStreamStatus('idle', 'Idle');
   updatePlayBtn(false);
 }
 
 // ── Video events ──
 function setupVideoEvents() {
-  video.addEventListener('play', () => { updatePlayBtn(true); setStatus('live', 'Live'); });
-  video.addEventListener('pause', () => { updatePlayBtn(false); if (currentChannel) setStatus('idle', 'Paused'); });
-  video.addEventListener('waiting', () => setStatus('loading', 'Buffering…'));
-  video.addEventListener('canplay', () => { if (currentChannel) setStatus('live', 'Live'); });
-  video.addEventListener('error', () => { setStatus('error', 'Stream failed'); updatePlayBtn(false); });
+  video.addEventListener('play', () => { updatePlayBtn(true); setStreamStatus('live', 'Live'); });
+  video.addEventListener('pause', () => { updatePlayBtn(false); if (currentChannel) setStreamStatus('idle', 'Paused'); });
+  video.addEventListener('waiting', () => setStreamStatus('loading', 'Buffering…'));
+  video.addEventListener('canplay', () => { if (currentChannel) setStreamStatus('live', 'Live'); });
+  video.addEventListener('error', () => { setStreamStatus('error', 'Stream failed'); updatePlayBtn(false); });
 
   // Seek bar — show for VOD, hide for live
   video.addEventListener('durationchange', () => {
@@ -594,6 +596,16 @@ function fmtTime(d) {
 }
 
 // ── Status ──
+// Status for the current stream: also drives the spinner / error overlay on the video.
+function setStreamStatus(state, msg) {
+  setStatus(state, msg);
+  const wrap = document.getElementById('video-wrap');
+  wrap.classList.toggle('loading', !!currentChannel && state === 'loading');
+  wrap.classList.toggle('error', !!currentChannel && state === 'error');
+  document.getElementById('loader-text').textContent =
+    state === 'error' ? 'This channel isn\'t available right now' : msg;
+}
+
 function setStatus(state, msg) {
   const dot = document.getElementById('status-dot');
   const txt = document.getElementById('status-text');
