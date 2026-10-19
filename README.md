@@ -160,3 +160,32 @@ MIT — do whatever you want with it.
 <div align="center">
   <sub>Made with Electron, hls.js, and too much caffeine</sub>
 </div>
+
+---
+
+## Android TV / Android box
+
+The `android/` folder wraps the same UI (`src/`) in a native Android WebView app with D-pad remote support.
+
+### Build the APK
+
+Requires JDK 17 and the Android SDK (`brew install openjdk@17 && brew install --cask android-commandlinetools`, then `sdkmanager "platforms;android-35" "build-tools;35.0.0"`).
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17
+export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+npm run build:android
+# Output: dist/IPTV-Player-AndroidTV.apk
+```
+
+### Remote controls
+
+| Button | Browsing | Watching full screen |
+|---|---|---|
+| D-pad | Move focus | Up/Down: change channel · Left/Right: seek 10s (VOD) |
+| OK | Select · OK on the playing channel goes full screen | Play / pause |
+| Back | Close panel · press twice to exit | Back to the channel list |
+| Play/Pause, Ch+/Ch−, FF/Rew | Media controls | Media controls |
+| Menu | Add/remove favorite | Add/remove favorite |
+
+Text fields (playlist URL, search, EPG URL) open an input dialog when you press OK.

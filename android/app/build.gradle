@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.iptvplayer.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.iptvplayer.app'
+        minSdk 21
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // Signed with the debug key so the APK can be sideloaded without a keystore.
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.assets.srcDirs += "$buildDir/generated/web-assets"
+    }
+}
+
+// Copy the shared web UI from ../../src into the APK assets, swapping the
+// CDN hls.js for the bundled copy and adding the Android bridge + TV remote layer.
+tasks.register('syncWeb', Copy) {
+    into "$buildDir/generated/web-assets/www"
+    from('../../src') {
+        include 'index.html', 'renderer.js'
+        filter { String line ->
+            line.replace('<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>',
+                         '<script src="hls.min.js"></script>\n<script src="android-bridge.js"></script>')
+                .replace('<script src="renderer.js"></script>',
+                         '<link rel="stylesheet" href="tv.css" />\n<script src="renderer.js"></script>\n<script src="tv.js"></script>')
+        }
+    }
+    from('../web')
+}
+preBuild.dependsOn syncWeb

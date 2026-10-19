@@ -1,0 +1,34 @@
+/* Android TV overrides — loaded only in the APK build. */
+body.android { --sidebar: 320px; }
+body.android .ch-item { padding: 10px 14px; }
+body.android .ch-thumb { width: 38px; height: 38px; }
+body.android .ch-name { font-size: 14px; }
+body.android .ch-group { font-size: 12px; }
+body.android .gtab { font-size: 13px; padding: 5px 12px; }
+
+/* Focus ring for D-pad navigation */
+body.android :focus { outline: none; }
+body.android .tb-btn:focus,
+body.android button:focus,
+body.android input:focus,
+body.android .gtab:focus,
+body.android .ch-item:focus,
+body.android .fav-item:focus,
+body.android #video-wrap:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+body.android .ch-item:focus,
+body.android .fav-item:focus { background: var(--bg3); }
+body.android .ch-item:focus .fav-btn,
+body.android .fav-btn:focus { opacity: 1; }
+
+/* Watch mode: video fills the screen */
+body.tv-watch #video-wrap {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 50;
+  outline: none;
+}
+body.tv-watch #osd-ch-name { font-size: 22px; }
+#osd-tv-status { font-size: 13px; color: var(--text2); text-shadow: 0 1px 4px rgba(0,0,0,0.8); }
