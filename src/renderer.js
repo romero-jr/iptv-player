@@ -61,8 +61,8 @@ function packChannels(channels) {
 }
 
 function unpackChannels(packed) {
-  return packed.map(c => ({
-    name: c[0], group: c[1], logo: c[2], url: c[3], tvgId: c[4], tvgName: c[5]
+  return packed.map((c, idx) => ({
+    idx, name: c[0], group: c[1], logo: c[2], url: c[3], tvgId: c[4], tvgName: c[5]
   }));
 }
 
@@ -113,17 +113,21 @@ function processM3U(text) {
   renderFavorites();
 }
 
+// Divider entries like "▬ France [FR] ▬" that some providers use instead of group-title
+const SEPARATOR_RE = /^[▬═━─■●★#*=~\-\s]{2,}(.+?)[▬═━─■●★#*=~\-\s]{2,}$/;
+
 function parseM3U(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const channels = [];
   let cur = null;
+  let section = null; // current divider name
   for (const line of lines) {
     if (line.startsWith('#EXTINF')) {
-      cur = { name: '', group: 'General', logo: '', url: '', tvgId: '', tvgName: '' };
+      cur = { idx: 0, name: '', group: 'General', logo: '', url: '', tvgId: '', tvgName: '', hasGroup: false };
       const nameMatch = line.match(/,(.+)$/);
       if (nameMatch) cur.name = nameMatch[1].trim();
       const groupMatch = line.match(/group-title="([^"]*)"/i);
-      if (groupMatch) cur.group = groupMatch[1] || 'General';
+      if (groupMatch) { cur.group = groupMatch[1] || 'General'; cur.hasGroup = true; }
       const logoMatch = line.match(/tvg-logo="([^"]*)"/i);
       if (logoMatch) cur.logo = logoMatch[1];
       const idMatch = line.match(/tvg-id="([^"]*)"/i);
@@ -132,7 +136,20 @@ function parseM3U(text) {
       if (nameTagMatch) cur.tvgName = nameTagMatch[1];
     } else if (cur && !line.startsWith('#')) {
       cur.url = line;
-      channels.push(cur);
+      const sep = !cur.hasGroup && cur.name.match(SEPARATOR_RE);
+      if (sep) {
+        section = sep[1].trim();
+      } else {
+        if (!cur.hasGroup) {
+          // Xtream-style URLs tell us the content type
+          if (/\/series\//.test(line)) cur.group = 'Series';
+          else if (section && /\/movie\//.test(line) && !/movie/i.test(section)) cur.group = section + ' · Movies';
+          else if (section) cur.group = section;
+        }
+        delete cur.hasGroup;
+        cur.idx = channels.length;
+        channels.push(cur);
+      }
       cur = null;
     }
   }
@@ -162,6 +179,12 @@ function setGroup(g) {
 }
 
 // ── Channel list ──
+// Rows are rendered in pages as the list scrolls, so playlists with
+// 100k+ entries don't build every row up front.
+const PAGE_SIZE = 200;
+let listItems = [];
+let listRendered = 0;
+
 function renderChannels() {
   const q = document.getElementById('search').value.toLowerCase();
   let list = allChannels;
@@ -174,29 +197,49 @@ function renderChannels() {
   if (q) list = list.filter(c => c.name.toLowerCase().includes(q));
 
   const el = document.getElementById('channel-list');
+  listItems = list;
   if (!list.length) {
     el.innerHTML = `<div class="list-empty">${allChannels.length ? 'No channels match.' : 'Load a playlist to get started.'}</div>`;
     return;
   }
 
-  el.innerHTML = list.map(c => {
-    const idx = allChannels.indexOf(c);
-    const isFav = favorites.has(c.name);
-    const isActive = currentChannel && currentChannel.name === c.name;
-    const initials = c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
-    const logoHtml = c.logo
-      ? `<img src="${esc(c.logo)}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" /><span style="display:none">${initials}</span>`
-      : initials;
-    return `<div class="ch-item${isActive ? ' active' : ''}" id="chi-${idx}" data-idx="${idx}">
-      <div class="ch-thumb">${logoHtml}</div>
-      <div class="ch-meta">
-        <div class="ch-name">${esc(c.name)}</div>
-        <div class="ch-group">${esc(c.group)}</div>
-      </div>
-      <button class="fav-btn${isFav ? ' starred' : ''}" data-fav-idx="${idx}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
-    </div>`;
-  }).join('');
+  listRendered = 0;
+  el.innerHTML = '';
+  el.scrollTop = 0;
+  appendChannelPage();
 }
+
+function appendChannelPage() {
+  const end = Math.min(listRendered + PAGE_SIZE, listItems.length);
+  const html = listItems.slice(listRendered, end).map(channelRowHtml).join('');
+  listRendered = end;
+  document.getElementById('channel-list').insertAdjacentHTML('beforeend', html);
+}
+
+function channelRowHtml(c) {
+  const idx = c.idx;
+  const isFav = favorites.has(c.name);
+  const isActive = currentChannel && currentChannel.name === c.name;
+  const initials = c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
+  const logoHtml = c.logo
+    ? `<img src="${esc(c.logo)}" onerror="this.style.display='none';this.nextSibling.style.display='flex'" /><span style="display:none">${initials}</span>`
+    : initials;
+  return `<div class="ch-item${isActive ? ' active' : ''}" id="chi-${idx}" data-idx="${idx}">
+    <div class="ch-thumb">${logoHtml}</div>
+    <div class="ch-meta">
+      <div class="ch-name">${esc(c.name)}</div>
+      <div class="ch-group">${esc(c.group)}</div>
+    </div>
+    <button class="fav-btn${isFav ? ' starred' : ''}" data-fav-idx="${idx}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">${isFav ? '★' : '☆'}</button>
+  </div>`;
+}
+
+document.getElementById('channel-list').addEventListener('scroll', (e) => {
+  const el = e.currentTarget;
+  if (listRendered < listItems.length && el.scrollTop + el.clientHeight > el.scrollHeight - 600) {
+    appendChannelPage();
+  }
+});
 
 // Single delegated listener on channel list (set up once)
 document.getElementById('channel-list').addEventListener('click', (e) => {
@@ -415,7 +458,17 @@ function toggleFav(idx) {
     showToast(`Added "${ch.name}" to favorites`);
   }
   window.electronAPI.saveData('favorites', [...favorites]);
-  renderChannels();
+  if (activeGroup === 'Favorites') {
+    renderChannels();
+  } else {
+    // Update the star in place so a long list keeps its scroll position
+    const isFav = favorites.has(ch.name);
+    document.querySelectorAll(`#channel-list [data-fav-idx="${idx}"]`).forEach(btn => {
+      btn.classList.toggle('starred', isFav);
+      btn.textContent = isFav ? '★' : '☆';
+      btn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+    });
+  }
   renderFavorites();
 }
 
@@ -427,7 +480,7 @@ function renderFavorites() {
     return;
   }
   el.innerHTML = list.map(c => {
-    const idx = allChannels.indexOf(c);
+    const idx = c.idx;
     const initials = c.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || '??';
     return `<div class="fav-item" data-idx="${idx}">
       <div class="ch-thumb" style="width:28px;height:28px;font-size:10px">${initials}</div>

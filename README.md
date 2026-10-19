@@ -188,4 +188,4 @@ npm run build:android
 | Play/Pause, Ch+/Ch−, FF/Rew | Media controls | Media controls |
 | Menu | Add/remove favorite | Add/remove favorite |
 
-Text fields (playlist URL, search, EPG URL) open an input dialog when you press OK.
+Text fields (playlist URL, search, EPG URL) open the on-screen keyboard when you press OK. Press the keyboard's Enter key to submit.

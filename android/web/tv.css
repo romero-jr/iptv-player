@@ -15,7 +15,7 @@ body.android .gtab:focus,
 body.android .ch-item:focus,
 body.android .fav-item:focus,
 body.android #video-wrap:focus {
-  outline: 3px solid var(--accent);
+  outline: 3px solid #fff;
   outline-offset: -3px;
 }
 body.android .ch-item:focus,

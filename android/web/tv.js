@@ -13,6 +13,9 @@
   const DIRS = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
 
   let watching = false;
+
+  // Hide the WebView's default grey play-button poster before a stream starts.
+  video.poster = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   let hintShown = false;
 
   // ── Watch mode (full screen video) ──
@@ -33,11 +36,12 @@
     }
   }
 
+  // Steps through the current tab / search results (listItems from renderer.js),
+  // including rows that haven't been rendered yet.
   function stepChannel(dir) {
-    const rows = [...document.querySelectorAll('#channel-list .ch-item')];
-    const cur = rows.findIndex(r => r.classList.contains('active'));
-    if (cur === -1 || rows.length < 2) navigateChannel(dir);
-    else playChannel(parseInt(rows[(cur + dir + rows.length) % rows.length].dataset.idx));
+    const cur = listItems.indexOf(currentChannel);
+    if (cur === -1 || listItems.length < 2) navigateChannel(dir);
+    else playChannel(listItems[(cur + dir + listItems.length) % listItems.length].idx);
     showOSD();
   }
 
@@ -155,15 +159,33 @@
     focusEl(row);
   }
 
-  // ── Activation ──
+  // ── Text inputs ──
+  // Google TV opens the on-screen keyboard as soon as a text field gets focus,
+  // which would trap the D-pad. Fields stay read-only until OK is pressed.
+  function isTextInput(el) {
+    return el && el.tagName === 'INPUT' && el.type === 'text';
+  }
+
+  document.querySelectorAll('input[type=text]').forEach(el => {
+    el.readOnly = true;
+    el.addEventListener('blur', () => { el.readOnly = true; });
+  });
+
   function editInput(el) {
-    const v = prompt(el.placeholder || 'Enter value', el.value);
-    if (v === null) return;
-    el.value = v.trim();
+    el.blur();
+    el.readOnly = false;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }
+
+  function finishInput(el) {
+    el.blur();
+    focusEl(el);
     if (el.id === 'm3u-url') loadPlaylist();
     else if (el.id === 'epg-url') loadEPG();
-    else if (el.id === 'search') renderChannels();
   }
+
+  // ── Activation ──
 
   // Lists are re-rendered with innerHTML, so restore focus to the same item afterwards.
   function focusKey(el) {
@@ -187,7 +209,7 @@
 
   function activate(el) {
     if (!el || el === document.body) { focusDefault(); return; }
-    if (el.tagName === 'INPUT' && el.type === 'text') { editInput(el); return; }
+    if (isTextInput(el)) { editInput(el); return; }
     if (el.id === 'video-wrap') { setWatching(true); return; }
     if (el.classList.contains('ch-item') && el.classList.contains('active') && currentChannel) {
       setWatching(true);
@@ -219,6 +241,11 @@
     const dir = DIRS[e.key];
     const enter = e.key === 'Enter' || e.keyCode === 13;
     if (!dir && !enter) return;
+    const el = document.activeElement;
+    if (isTextInput(el) && !el.readOnly) {
+      if (dir === 'left' || dir === 'right') return; // move the caret
+      if (enter) { e.preventDefault(); e.stopImmediatePropagation(); finishInput(el); return; }
+    }
     e.preventDefault();
     e.stopImmediatePropagation();
     if (watching) handleWatchKey(dir, enter);
@@ -245,6 +272,8 @@
   // Called by MainActivity on the Back button. Return true if handled;
   // otherwise the app asks for a second press to exit.
   window.__onBack = () => {
+    const el = document.activeElement;
+    if (isTextInput(el) && !el.readOnly) { el.blur(); focusEl(el); return true; }
     if (watching) { setWatching(false); return true; }
     if (favPanelOpen) { toggleFavPanel(); focusDefault(); return true; }
     if (epgPanelOpen) { toggleEpgPanel(); focusDefault(); return true; }
