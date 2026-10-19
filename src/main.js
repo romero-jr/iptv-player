@@ -12,7 +12,7 @@ function createWindow() {
   const isWin = process.platform === 'win32';
 
   const preloadPath = path.join(__dirname, 'preload.js');
-  const iconPath = path.join(__dirname, '..', '..', '..', 'assets', isWin ? 'icon.ico' : 'icon.png');
+  const iconPath = path.join(app.getAppPath(), 'assets', isWin ? 'icon.ico' : 'icon.png');
 
   const logLines = [
     `isPackaged: ${app.isPackaged}`,
